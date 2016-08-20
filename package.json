@@ -1,0 +1,13 @@
+{
+  "name": "webexec",
+  "description": "Run shell commands from a web interface",
+  "version": "0.0.1",
+  "dependencies": {
+    "ws": ">=1.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SlyTrunk/webexec.git"
+  },
+  "license": "MIT"
+}

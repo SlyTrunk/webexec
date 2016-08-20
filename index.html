@@ -1,0 +1,240 @@
+<!doctype html>
+<html>
+  <head>
+    <title>WebExec</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+      html, body {
+        font: 13px sans-serif;
+        color: #ededed;
+        background: #212121;
+        margin: 0;
+        height: 100%;
+        -webkit-text-size-adjust: none;
+      }
+      #run, #stop, #pause, #resume, #reconnect {
+        display: none;
+      }
+      .running #stop, .running #pause,
+      .paused #stop, .paused #resume,
+      .stopped #run {
+        display: inline;
+      }
+      label {
+        margin-right: 10px;
+      }
+      #controls {
+        float: right;
+      }
+      #status {
+        clear: both;
+        text-align: center;
+        margin: 4px -10px -10px;
+        padding: 3px 10px;
+      }
+      #reconnect {
+        margin-left: 10px;
+        padding: 2px 4px;
+        font-size: 11px;
+        line-height: 1;
+        vertical-align: bottom;
+        color: black;
+        background: white;
+        border: none;
+        box-shadow: 0 0 3px rgba(0,0,0,.3);
+        cursor: pointer;
+      }
+      .info #reconnect, .error #reconnect {
+        display: inline;
+      }
+      #status.info, #status.connecting {
+        background: #ff0;
+      }
+      #status.error, #status.fatal {
+        background: #c33;
+        color: white;
+      }
+      #form {
+        padding: 10px;
+        background: white;
+        color: black;
+        box-shadow: 0 0 10px rgba(0,0,0,.3);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+      }
+      #log {
+        padding: 10px;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="form">
+      <div id="controls">
+        <button id="run">Run</button>
+        <button id="stop">Stop</button>
+        <button id="pause">Pause</button>
+        <button id="resume">Resume</button>
+      </div>
+      <div id="fields"></div>
+      <div id="status"><span></span><button id="reconnect">Connect Now</button></div>
+    </div>
+    <pre id="log"></pre>
+    <script>
+      (function() {
+        var form = document.getElementById('form'),
+            fields = document.getElementById('fields'),
+            run = document.getElementById('run'),
+            stop = document.getElementById('stop'),
+            pause = document.getElementById('pause'),
+            resume = document.getElementById('resume'),
+            reconnect = document.getElementById('reconnect'),
+            log = document.getElementById('log'),
+            socket, unload, countdown, args = [], retries = 0;
+        var dom = function() {
+          var attr = function(node, parent) {
+            Object.keys(node).forEach(function(k) {
+              if (k == 'children') return;
+              var n = node[k];
+              if (typeof parent[k] == 'undefined' || typeof n != 'object' || n == null)
+                return parent[k] = n;
+              attr(n, parent[k], true);
+            });
+            return node.children;
+          };
+          return function dom(node, parent, clear) {
+            if (clear && parent) while (parent.firstChild) parent.removeChild(parent.firstChild);
+            switch (typeof node) {
+              case 'object':
+                if (!node) return;
+                if (Array.isArray(node)) {
+                  node.forEach(function(node) { dom(node, parent); });
+                  return parent;
+                }
+                var tag = Object.keys(node)[0],
+                    elem = document.createElement(tag);
+                if (parent) parent.appendChild(elem); 
+                node = node[tag];
+                dom(typeof node == 'object' && node && !Array.isArray(node) ? attr(node, elem) : node, elem);
+                return elem;
+              case 'function':
+                return dom(node(parent), parent);
+              case 'string':
+              case 'number':
+                node = document.createTextNode(node);
+                return parent ? parent.appendChild(node) : node;
+            }
+          };
+        }();
+        window.onbeforeunload = function() {
+          unload = true;
+        };
+        var resize = window.onresize = function() {
+          log.style.paddingTop = 10 + form.offsetHeight + 'px';
+        };
+        var status = function() {
+          var status = document.getElementById('status');
+          return function(message, type) {
+            status.firstChild.textContent = message;
+            status.className = message ? type|| 'info' : null;
+            resize();
+          };
+        }();
+        var connect = function() {
+          if (socket) return;
+          if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
+          clearInterval(countdown);
+          status('Connecting...', 'connecting');
+          socket = new WebSocket((location.protocol == 'https:' ? 'wss://' : 'ws://')+location.host+location.pathname);
+          socket.onopen = function() {
+            status();
+            retries = 0;
+            run.disabled = stop.disabled = pause.disabled = resume.disabled = false;
+          };
+          socket.onmessage = function(e) {
+            try { var message = JSON.parse(e.data); } catch (e) { return; }
+            Object.keys(message).forEach(function(key) {
+              switch (key) {
+                case 'name':
+                  break; // TODO
+                case 'state':
+                  form.className = message.state;
+                  if (message.state == 'running' && message.args)
+                    log.textContent = '';
+                  resize();
+                  break;
+                case 'fields':
+                  args = [];
+                  dom(message.fields.map(function(field) {
+                    return {label: [
+                      {span: field.name+' '},
+                      field.options ? {select: function(e) {
+                        args.push(e);
+                        return field.options.map(function(option) {
+                          return {option: {value: option.value, children: option.name}};
+                        });
+                      }} : {input: function(e) {
+                        args.push(e);
+                      }}
+                    ]};
+                  }), fields, true);
+                  resize();
+                  break;
+                case 'args':
+                  message.args.forEach(function(value, i) {
+                    args[i].value = value;
+                  });
+                  break;
+                case 'out':
+                  var body = document.body,
+                      sticky = body.scrollTop + body.clientHeight >= body.scrollHeight;
+                  log.textContent += message.out;
+                  if (sticky) body.scrollTop = body.scrollHeight;
+                  break;
+              };
+            });
+          };
+          socket.onclose = function() {
+            socket = null;
+            run.disabled = pause.disabled = stop.disabled = resume.disabled = true;
+            args.forEach(function(e) { e.disabled = true; });
+            if (unload) return;
+            if (retries == 6) return status('Disconnected', 'error');
+            var seconds = 1 << retries++;
+            status('Reconnecting in '+seconds);
+            countdown = setInterval(function() {
+              if (--seconds) status('Reconnecting in '+seconds);
+              else connect();
+            }, 1000);
+          };
+        };
+        var send = function(message) {
+          if (socket && socket.readyState == 1)
+            socket.send(JSON.stringify(message));
+        };
+        run.onclick = function() {
+          send({command: 'start', args: args.map(function(field) { return field.value; })});
+          form.className = 'running';
+          log.textContent = '';
+        };
+        stop.onclick = function() {
+          send({command: 'stop'});
+          form.className = 'stopped';
+        };
+        pause.onclick = function() {
+          send({command: 'pause'});
+          form.className = 'paused';
+        };
+        resume.onclick = function() {
+          send({command: 'resume'});
+          form.className = 'running';
+        };
+        reconnect.onclick = connect;
+        connect();
+      }());
+    </script>
+  </body>
+</html>
