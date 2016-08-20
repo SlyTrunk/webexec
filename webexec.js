@@ -1,8 +1,11 @@
 var spawn = require('child_process').spawn;
 
-exports.connectHandler = function(name, command) {
+exports.connectHandler = function(name, command, options) {
   
-  var clients = [], job = {};
+  if (!options) options = {};
+  var maxLogLength = options.maxLogLength || 10000,
+      clients = [],
+      job = {};
 
   var broadcast = function(message, exclude) {
     message = JSON.stringify(message);
@@ -27,15 +30,23 @@ exports.connectHandler = function(name, command) {
             job.process = spawn('/usr/bin/env', command.map(function(part) {
               if (typeof part == 'string') return part;
               return message.args.shift();
-            }));
+            }), {
+              cwd: options.cwd
+            });
             job.process.stdout.on('data', function(data) {
               job.log += data = data.toString();
+              if (job.log.length > maxLogLength) {
+                var start = job.log.length - maxLogLength,
+                    i = job.log.indexOf('\n', start);
+                job.log = '[output truncated]\n'+job.log.substr(i < 0 ? start : i+1);
+              }
               broadcast({out: data});
             });
             job.process.stderr.on('data', function(data) {
               console.log(data.toString());
             });
             job.process.on('close', function() {
+              console.log('[process exited]');
               broadcast({state: 'stopped'});
               job = {};
             });

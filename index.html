@@ -138,8 +138,8 @@
         var status = function() {
           var status = document.getElementById('status');
           return function(message, type) {
-            status.firstChild.textContent = message;
-            status.className = message ? type|| 'info' : null;
+            status.firstChild.textContent = message || '';
+            status.className = message ? type || 'info' : null;
             resize();
           };
         }();
