@@ -160,7 +160,8 @@
             Object.keys(message).forEach(function(key) {
               switch (key) {
                 case 'name':
-                  break; // TODO
+                  document.title = message.name;
+                  break;
                 case 'state':
                   form.className = message.state;
                   if (message.state == 'running' && message.args)
