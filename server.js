@@ -1,7 +1,7 @@
 var http = require('http'),
     wss = require('ws').Server,
     fs = require('fs'),
-    webexec = require('./webexec');
+    webexec = require('./');
 
 var server = http.createServer(function(request, response) {
   response.writeHead(200, {'Content-Type': 'text/html'});
