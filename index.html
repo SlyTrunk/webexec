@@ -7,11 +7,17 @@
     <style>
       html, body {
         font: 13px sans-serif;
-        color: #ededed;
         background: #212121;
         margin: 0;
         height: 100%;
         -webkit-text-size-adjust: none;
+      }
+      header {
+        box-shadow: 0 0 10px black;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
       }
       #run, #stop, #pause, #resume, #reconnect {
         display: none;
@@ -31,8 +37,6 @@
       #status {
         clear: both;
         text-align: center;
-        margin: -1px -10px -5px;
-        padding: 3px 10px;
       }
       #reconnect {
         margin-left: 10px;
@@ -50,39 +54,43 @@
         display: inline;
       }
       #status.info, #status.connecting {
+        padding: 3px 10px;
         background: #ff0;
       }
       #status.error, #status.fatal {
+        padding: 3px 10px;
         background: #c33;
         color: white;
       }
       #form {
+        display: none;
         padding: 10px 10px 5px;
         background: white;
         color: black;
-        box-shadow: 0 0 10px rgba(0,0,0,.3);
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
+      }
+      #form.running, #form.paused, #form.stopped {
+        display: block;
       }
       #log {
         padding: 10px;
         margin: 0;
+        color: #ededed;
       }
     </style>
   </head>
   <body>
-    <div id="form">
-      <div id="controls">
-        <button id="run">Run</button>
-        <button id="stop">Stop</button>
-        <button id="pause">Pause</button>
-        <button id="resume">Resume</button>
+    <header>
+      <div id="form">
+        <div id="controls">
+          <button id="run">Run</button>
+          <button id="stop">Stop</button>
+          <button id="pause">Pause</button>
+          <button id="resume">Resume</button>
+        </div>
+        <div id="fields"></div>
       </div>
-      <div id="fields"></div>
       <div id="status"><span></span><button id="reconnect">Connect Now</button></div>
-    </div>
+    </header>
     <pre id="log"></pre>
     <script>
       (function() {
@@ -140,7 +148,7 @@
           var status = document.getElementById('status');
           return function(message, type) {
             status.firstChild.textContent = message || '';
-            status.className = message ? type || 'info' : null;
+            status.className = message ? type || 'info' : '';
             resize();
           };
         }();

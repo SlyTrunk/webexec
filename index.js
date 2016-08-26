@@ -25,14 +25,16 @@ exports.connectHandler = function(name, command, options) {
         switch (message.command) {
           case 'start':
             if (job.process) return;
+            var args = command.map(function(part) {
+              if (typeof part == 'string') return part;
+              var arg = message.args.shift();
+              if (part.options && !part.options.some(function(o) { return o.value === arg; }))
+                throw 'Invalid option for field '+part.name+': '+arg;
+              return arg;
+            });
             job.log = '';
             job.args = message.args.slice(0);
-            job.process = spawn('/usr/bin/env', command.map(function(part) {
-              if (typeof part == 'string') return part;
-              return message.args.shift();
-            }), {
-              cwd: options.cwd
-            });
+            job.process = spawn('/usr/bin/env', args, {cwd: options.cwd});
             job.process.stdout.on('data', function(data) {
               job.log += data = data.toString();
               if (job.log.length > maxLogLength) {
@@ -72,7 +74,7 @@ exports.connectHandler = function(name, command, options) {
             break;
         }
       } catch (e) {
-        console.log('error parsing incoming message: '+e+'\n'+message);
+        console.log('Error parsing incoming message: '+e);
       }
     });
     
