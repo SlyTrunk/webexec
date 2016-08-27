@@ -29,7 +29,7 @@ exports.connectHandler = function(name, command, options) {
               if (typeof part == 'string') return part;
               var arg = message.args.shift();
               if (part.options && !part.options.some(function(o) { return o.value+'' === arg; }))
-                throw 'Invalid option for field '+part.name+': '+arg;
+                throw new Error('Invalid option for field '+part.name+': '+arg);
               return arg;
             });
             job.log = '';
@@ -74,7 +74,7 @@ exports.connectHandler = function(name, command, options) {
             break;
         }
       } catch (e) {
-        console.log('Error parsing incoming message: '+e);
+        console.log('Error parsing incoming message: '+e.message);
       }
     });
     
