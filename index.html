@@ -161,6 +161,7 @@
           socket.onopen = function() {
             status();
             retries = 0;
+            log.textContent = '';
             run.disabled = stop.disabled = pause.disabled = resume.disabled = false;
           };
           socket.onmessage = function(e) {
